@@ -1,6 +1,10 @@
 #ifndef __MONITOR_DIFFTEST_H__
 #define __MONITOR_DIFFTEST_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <common.h>
 
 #ifdef DIFF_TEST
@@ -26,5 +30,9 @@ static inline bool difftest_check_reg(const char *name, vaddr_t pc, rtlreg_t ref
   }
   return true;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

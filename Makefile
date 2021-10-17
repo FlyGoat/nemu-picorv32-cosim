@@ -1,9 +1,14 @@
 NAME = nemu
 
-ISA ?= x86
+ISA ?= picorv32
 ISAS = $(shell ls src/isa/)
 ifeq ($(filter $(ISAS), $(ISA)), ) # ISA must be valid
 $(error Invalid ISA. Supported: $(ISAS))
+endif
+
+ifeq ($(ISA), picorv32)
+VERILATOR = verilator
+VERILATOR_ROOT ?= $(shell $(VERILATOR) --getenv VERILATOR_ROOT)
 endif
 
 ENGINE ?= interpreter
@@ -14,15 +19,20 @@ endif
 
 $(info Building $(ISA)-$(NAME)-$(ENGINE))
 
+STATIC_LIBS =
 INC_DIR += ./include ./src/engine/$(ENGINE)
 BUILD_DIR ?= ./build
+
+ifeq ($(ISA), picorv32)
+INC_DIR += $(VERILATOR_ROOT)/include $(VERILATOR_ROOT)/include/vltstd $(OBJ_DIR)/picorv32
+endif
 
 ifdef SHARE
 SO = -so
 SO_CFLAGS = -fPIC -D_SHARE=1
 SO_LDLAGS = -shared -fPIC
 else
-LD_LIBS = -lSDL2 -lreadline -ldl
+LD_LIBS = -lm -ldl -lSDL2 -lreadline -ldl -lstdc++
 endif
 
 ifndef SHARE
@@ -55,29 +65,52 @@ endif
 OBJ_DIR ?= $(BUILD_DIR)/obj-$(ISA)-$(ENGINE)$(SO)
 BINARY ?= $(BUILD_DIR)/$(ISA)-$(NAME)-$(ENGINE)$(SO)
 
-include Makefile.git
+#include Makefile.git
 
 .DEFAULT_GOAL = app
 
 # Compilation flags
-CC = gcc
-LD = gcc
+CC ?= gcc
+CXX ?= g++
+LD ?= gcc
 INCLUDES  = $(addprefix -I, $(INC_DIR))
-CFLAGS   += -O2 -MMD -Wall -Werror -ggdb3 $(INCLUDES) \
+CFLAGS   += -O2 -MMD -ggdb3 $(INCLUDES) \
             -D__ENGINE_$(ENGINE)__ \
             -D__ISA__=$(ISA) -D__ISA_$(ISA)__ -D_ISA_H_=\"isa/$(ISA).h\"
+CXXFLAGS += -std=gnu++14
+CXXFLAGS += $(CFLAGS)
 
 # Files to be compiled
 SRCS = $(shell find src/ -name "*.c" | grep -v "isa\|engine")
 SRCS += $(shell find src/isa/$(ISA) -name "*.c")
 SRCS += $(shell find src/engine/$(ENGINE) -name "*.c")
-OBJS = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
+CXXSRCS = $(shell find src/isa/$(ISA) -name "*.cc")
 
+OBJS = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
+OBJS += $(CXXSRCS:src/%.cc=$(OBJ_DIR)/%.o)
+
+ifeq ($(ISA), picorv32)
+STATIC_LIBS += $(OBJ_DIR)/picorv32/Vpicorv32__ALL.a
+
+$(OBJ_DIR)/picorv32/Vpicorv32__ALL.a:
+	@echo + VERILATOR $@
+		@mkdir -p $(dir $@)
+	$(VERILATOR) -cc --build --trace ./verilator/picorv32/picorv32.v --top picorv32 -Mdir $(dir $@)
+endif
+
+$(OBJS): $(STATIC_LIBS)
 # Compilation patterns
 $(OBJ_DIR)/%.o: src/%.c
 	@echo + CC $<
 	@mkdir -p $(dir $@)
 	@$(CC) $(CFLAGS) $(SO_CFLAGS) -c -o $@ $<
+
+
+# Compilation patterns
+$(OBJ_DIR)/%.o: src/%.cc
+	@echo + CXX $<
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) $(SO_CFLAGS) -c -o $@ $<
 
 
 # Depencies
@@ -96,9 +129,9 @@ IMG :=
 NEMU_EXEC := $(BINARY) $(ARGS) $(IMG)
 
 $(BINARY): $(OBJS)
-	$(call git_commit, "compile")
+#	$(call git_commit, "compile")
 	@echo + LD $@
-	@$(LD) -O2 -rdynamic $(SO_LDLAGS) -o $@ $^ $(LD_LIBS)
+	@$(CC) -O2 -rdynamic $(SO_LDLAGS) -o $@ $^ $(STATIC_LIBS) $(LD_LIBS)
 
 run-env: $(BINARY) $(DIFF_REF_SO)
 

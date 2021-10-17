@@ -5,6 +5,10 @@
 // It will be expanded as "isa/x86.h" or "isa/mips32.h" ...
 #include _ISA_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // The macro `__ISA__` is defined in $(CFLAGS).
 // It will be expanded as "x86" or "mips32" ...
 #define IMAGE_START concat(__ISA__, _IMAGE_START)
@@ -33,6 +37,9 @@ int isa_vaddr_check(vaddr_t vaddr, int type, int len);
 #endif
 #define isa_has_mem_exception concat(__ISA__, _has_mem_exception)
 
+// trace
+extern char *trace_file;
+
 // difftest
   // for dut
 bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc);
@@ -42,5 +49,9 @@ void isa_difftest_attach();
 void isa_difftest_getregs(void *r);
 void isa_difftest_setregs(const void *r);
 void isa_difftest_raise_intr(word_t NO);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

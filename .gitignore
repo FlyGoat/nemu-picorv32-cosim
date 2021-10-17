@@ -1,8 +1,5 @@
-*.*
-*
-!*/
+build
 !Makefile*
-!*.[cSh]
 !.gitignore
 !README.md
 !runall.sh

@@ -49,12 +49,22 @@ static inline void pmem_write(paddr_t addr, word_t data, int len) {
 
 /* Memory accessing interfaces */
 
-inline word_t paddr_read(paddr_t addr, int len) {
-  if (in_pmem(addr)) return pmem_read(addr, len);
-  else return map_read(addr, len, fetch_mmio_map(addr));
+word_t paddr_read(paddr_t addr, int len) {
+  word_t data;
+  if (in_pmem(addr))
+    data = pmem_read(addr, len);
+  else
+    data = map_read(addr, len, fetch_mmio_map(addr));
+#ifdef DEBUG
+    Log("addr: "FMT_WORD", len: "FMT_WORD", data "FMT_WORD, addr, len, data);
+#endif
+  return data;
 }
 
-inline void paddr_write(paddr_t addr, word_t data, int len) {
+void paddr_write(paddr_t addr, word_t data, int len) {
+#ifdef DEBUG
+  Log("addr: "FMT_WORD", data: "FMT_WORD", len: "FMT_WORD, addr, data, len);
+#endif
   if (in_pmem(addr)) pmem_write(addr, data, len);
   else map_write(addr, data, len, fetch_mmio_map(addr));
 }

@@ -1,6 +1,10 @@
 #ifndef __MACRO_H__
 #define __MACRO_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define str_temp(x) #x
 #define str(x) str_temp(x)
 
@@ -15,5 +19,9 @@
 #define BITMASK(bits) ((1 << (bits)) - 1)
 #define BITS(x, hi, lo) (((x) >> (lo)) & BITMASK((hi) - (lo) + 1)) // similar to x[hi:lo] in verilog
 #define SEXT(x, len) ({ struct { int64_t n : len; } __x = { .n = x }; (int64_t)__x.n; })
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

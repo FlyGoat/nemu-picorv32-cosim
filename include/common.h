@@ -1,6 +1,10 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //#define DEBUG
 //#define DIFF_TEST
 
@@ -12,13 +16,15 @@
 #endif
 
 /* You will define this macro in PA2 */
-//#define HAS_IOE
+#define HAS_IOE
 
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
 
+#ifndef __cplusplus
 typedef uint8_t bool;
+#endif
 
 typedef uint32_t word_t;
 typedef int32_t sword_t;
@@ -35,4 +41,7 @@ typedef uint16_t ioaddr_t;
 #include <debug.h>
 #include <macro.h>
 
+#ifdef __cplusplus
+}
+#endif
 #endif

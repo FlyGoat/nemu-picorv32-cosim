@@ -1,6 +1,10 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include <assert.h>
 #include <monitor/log.h>
@@ -27,5 +31,9 @@
 #define panic(...) Assert(0, __VA_ARGS__)
 
 #define TODO() panic("please implement me")
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

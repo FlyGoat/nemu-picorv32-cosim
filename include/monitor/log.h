@@ -1,6 +1,10 @@
 #ifndef __MONITOR_LOG_H__
 #define __MONITOR_LOG_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <common.h>
 
 #ifdef DEBUG
@@ -24,5 +28,9 @@ extern FILE* log_fp;
   } while (0)
 
 void strcatf(char *buf, const char *fmt, ...);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
