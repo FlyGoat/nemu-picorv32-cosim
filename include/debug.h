@@ -9,6 +9,9 @@ extern "C" {
 #include <assert.h>
 #include <monitor/log.h>
 
+extern void isa_reg_display();
+extern void monitor_statistic();
+
 #define Log(format, ...) \
     _Log("\33[1;34m[%s,%d,%s] " format "\33[0m\n", \
         __FILE__, __LINE__, __func__, ## __VA_ARGS__)
@@ -20,8 +23,6 @@ extern "C" {
       fprintf(stderr, "\33[1;31m"); \
       fprintf(stderr, __VA_ARGS__); \
       fprintf(stderr, "\33[0m\n"); \
-      extern void isa_reg_display(); \
-      extern void monitor_statistic(); \
       isa_reg_display(); \
       monitor_statistic(); \
       assert(cond); \
