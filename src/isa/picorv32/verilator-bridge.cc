@@ -4,18 +4,77 @@
 #include <memory/paddr.h>
 #include <monitor/monitor.h>
 
-#include "Vpicorv32.h"
+#include "axi_responder.hh"
+
+#include "Vpicorv32_axi.h"
 #include "verilated_vcd_c.h"
 
-Vpicorv32 *tb;
+Vpicorv32_axi *tb;
 VerilatedVcdC	*m_trace;
+AXIResponder *axi;
+AXIResponder::connections conn;
+
+uint8_t dummy_out8;
+uint8_t const_zero8 = 0;
+uint32_t const_zero32 = 0;
+uint8_t const_four8 = 4;
 
 static uint64_t trace_tick = 0;
+
+void mem_read(uint32_t addr, uint8_t len, void *buf) {
+    uint8_t mylen = len;
+    uint32_t myaddr = addr;
+    uint32_t *buf_u32 = (uint32_t *)buf;
+    uint8_t *buf_u8 = (uint8_t *)buf;
+
+    /* Workaround: It won't allow read >= word_t */
+    while (mylen >= 4)
+    {
+        buf_u32[(myaddr - addr) / 4] = paddr_read(myaddr, 4);
+        myaddr += 4;
+        mylen -= 4;
+    }
+
+    while (mylen > 0)
+    {
+        buf_u8[(myaddr - addr)] = paddr_read(myaddr, 1);
+        myaddr += 1;
+        mylen -= 1;
+    }
+}
+void mem_write(uint32_t addr, uint8_t len, void *buf) {
+    uint8_t mylen = len;
+    uint32_t myaddr = addr;
+    uint32_t *buf_u32 = (uint32_t *)buf;
+    uint8_t *buf_u8 = (uint8_t *)buf;
+
+    if (len <= 4) {
+        paddr_write(addr, *buf_u32, len);
+        return;
+    }
+
+    /* Workaround: It won't allow write >= word_t */
+    while (mylen >= 4)
+    {
+        paddr_write(myaddr, (word_t)buf_u32[(myaddr - addr) / 4], 4);
+        myaddr += 4;
+        mylen -= 4;
+    }
+
+    while (mylen > 0)
+    {
+        paddr_write(myaddr, (word_t)buf_u32[(myaddr - addr) / 4], 1);
+        myaddr += 1;
+        mylen -= 1;
+    }
+}
+
 
 inline void trace_eval() {
     tb->eval();
     if (m_trace) {
         m_trace->dump(trace_tick);
+        m_trace->flush();
         trace_tick++;
     }
 }
@@ -24,7 +83,7 @@ extern "C" int Vinit(int argc, char **argv) {
     int i;
     // Initialize Verilators variables
     Verilated::commandArgs(argc, argv);
-    tb = new Vpicorv32;
+    tb = new Vpicorv32_axi;
 
     if (trace_file) {
         Verilated::traceEverOn(true);
@@ -32,6 +91,42 @@ extern "C" int Vinit(int argc, char **argv) {
         tb->trace(m_trace, 99);
         m_trace->open(trace_file);
     }
+
+    tb->mem_axi_awvalid = 0;
+
+	conn = {
+		.aw_awvalid = &tb->mem_axi_awvalid,
+		.aw_awready = &tb->mem_axi_awready,
+		.aw_awid = &const_zero8,
+		.aw_awlen = &const_zero8,
+		.aw_awaddr = &tb->mem_axi_awaddr,
+		
+		.w_wvalid = &tb->mem_axi_wvalid,
+		.w_wready = &tb->mem_axi_wready,
+		.w_wdata = &tb->mem_axi_wdata,
+		.w_wstrb = &tb->mem_axi_wstrb,
+		.w_wlast = &tb->mem_axi_wvalid,
+		
+		.b_bvalid = &tb->mem_axi_bvalid,
+		.b_bready = &tb->mem_axi_bready,
+		.b_bid = &const_zero8,
+
+		.ar_arvalid = &tb->mem_axi_arvalid,
+		.ar_arready = &tb->mem_axi_arready,
+		.ar_arid = &const_zero8,
+		.ar_arlen = &const_zero8,
+		.ar_araddr = &tb->mem_axi_araddr,
+	
+		.r_rvalid = &tb->mem_axi_rvalid,
+		.r_rready = &tb->mem_axi_rready,
+		.r_rid = &const_zero8,
+		.r_rlast = &dummy_out8,
+		.r_rdata = &tb->mem_axi_rdata,
+	};
+
+    axi = new AXIResponder(conn, "main_mem");
+    axi->mem_read = mem_read;
+    axi->mem_write = mem_write;
 
     tb->resetn = 0;
     // Reset CPU for a while
@@ -41,70 +136,21 @@ extern "C" int Vinit(int argc, char **argv) {
     }
 
     tb->resetn = 1;
-    tb->mem_ready = 1;
 
     return 0;
-}
-
-void process_bus() {
-    if (!(tb->mem_ready && tb->mem_valid))
-        return;
-
-    if (tb->mem_wstrb) {
-        int shift;
-        int length;
-        /* is_write */
-        switch (tb->mem_wstrb) {
-        case 0xf: /* 4'b1111 */
-            shift = 0;
-            length = 4;
-            break;
-        case 0x1: /* 4'b0001 */
-            shift = 0;
-            length = 1;
-            break;
-        case 0x2: /* 4'b0010 */
-            shift = 1;
-            length = 1;
-            break;
-        case 0x4: /* 4'b0100 */
-            shift = 2;
-            length = 1;
-            break;
-        case 0x8: /* 4'b1000 */
-            shift = 3;
-            length = 1;
-            break;
-        case 0x3: /* 4'b0011 */
-            shift = 0;
-            length = 2;
-            break;
-        case 0xc: /* 4'b1100 */
-            shift = 2;
-            length = 2;
-            break;
-        default:
-            assert(0);
-            break;
-        }
-        paddr_write(tb->mem_addr + shift, tb->mem_wdata >> (shift*8), length);
-    } else {
-        /* is_read */
-        tb->mem_rdata = paddr_read(tb->mem_addr, 4);
-    }
 }
 
 void check_trap() {
     if (tb->trap) {
         nemu_state.state = NEMU_ABORT;
-        nemu_state.halt_pc = tb->mem_addr;
+        nemu_state.halt_pc = tb->mem_axi_araddr;
         printf("picorv32 trapped (pc is last mem rw addr)\n");
     }
 }
 
 void signal_processing() {
     check_trap();
-    process_bus();
+    axi->eval();
 }
 
 int Vtick_cpu() {
@@ -119,8 +165,6 @@ int Vtick_cpu() {
     tb->clk = 0;
     trace_eval();
 
-    if (m_trace)
-      m_trace->flush();
 
     return 0;
 }

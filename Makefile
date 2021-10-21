@@ -74,7 +74,7 @@ CC ?= gcc
 CXX ?= g++
 LD ?= gcc
 INCLUDES  = $(addprefix -I, $(INC_DIR))
-CFLAGS   += -O2 -MMD -ggdb3 $(INCLUDES) \
+CFLAGS   += -MMD -g $(INCLUDES) \
             -D__ENGINE_$(ENGINE)__ \
             -D__ISA__=$(ISA) -D__ISA_$(ISA)__ -D_ISA_H_=\"isa/$(ISA).h\"
 CXXFLAGS += -std=gnu++14
@@ -90,12 +90,12 @@ OBJS = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
 OBJS += $(CXXSRCS:src/%.cc=$(OBJ_DIR)/%.o)
 
 ifeq ($(ISA), picorv32)
-STATIC_LIBS += $(OBJ_DIR)/picorv32/Vpicorv32__ALL.a
+STATIC_LIBS += $(OBJ_DIR)/picorv32/Vpicorv32_axi__ALL.a
 
-$(OBJ_DIR)/picorv32/Vpicorv32__ALL.a:
+$(OBJ_DIR)/picorv32/Vpicorv32_axi__ALL.a:
 	@echo + VERILATOR $@
 		@mkdir -p $(dir $@)
-	$(VERILATOR) -cc --build --trace ./verilator/picorv32/picorv32.v --top picorv32 -Mdir $(dir $@)
+	$(VERILATOR) -cc --build --trace ./verilator/picorv32/picorv32.v --top picorv32_axi -Mdir $(dir $@)
 endif
 
 $(OBJS): $(STATIC_LIBS)
@@ -131,7 +131,7 @@ NEMU_EXEC := $(BINARY) $(ARGS) $(IMG)
 $(BINARY): $(OBJS)
 #	$(call git_commit, "compile")
 	@echo + LD $@
-	@$(CC) -O2 -rdynamic $(SO_LDLAGS) -o $@ $^ $(STATIC_LIBS) $(LD_LIBS)
+	@$(CC) -g -rdynamic $(SO_LDLAGS) -o $@ $^ $(STATIC_LIBS) $(LD_LIBS)
 
 run-env: $(BINARY) $(DIFF_REF_SO)
 
