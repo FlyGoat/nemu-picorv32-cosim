@@ -8,6 +8,20 @@
 #define AXILog(...)
 #endif
 
+#define GENMASK(h, l) \
+        (((~0UL) - (1UL << (l)) + 1) & (~0UL >> (sizeof(unsigned long) * 8 - 1 - (h))))
+
+bool find_strb_transation(uint32_t strb, int *offset, int *len)
+{
+    if (!strb)
+        return false;
+    
+    *offset = __builtin_ffs(strb) - 1;
+    *len = __builtin_ctz(~(strb >> *offset));
+
+    return true;
+}
+
 AXIResponder::AXIResponder(struct connections _dla, const char *_name) {
     dla = _dla;
     
@@ -103,11 +117,8 @@ void AXIResponder::eval() {
     
     /* now handle the write FIFOs ... */
     if (!aw_fifo.empty() && !w_fifo.empty()) {
-        AXI_WDATA_TYPE buf[AXI_WIDTH/AXI_WDATA_TYLEN];
-        uint8_t *buf_u8 = (uint8_t *)(&buf);
-        bool pending_write = false;
-        AXI_ADDR_TYPE start_addr;
-        uint8_t cur_len = 0;
+        int woff, wlen;
+        uint32_t strb;
 
         axi_aw_txn &awtxn = aw_fifo.front();
         axi_w_txn &wtxn = w_fifo.front();
@@ -115,26 +126,12 @@ void AXIResponder::eval() {
         if (wtxn.wlast != (awtxn.awlen == 0)) {
             AXILog("%s: wlast / awlen mismatch\n", name);
         }
-        
-        for (int i = 0; i < AXI_WIDTH / 8; i++) {
-            AXI_ADDR_TYPE strb_addr = awtxn.awaddr + i;
-            if (!((wtxn.wstrb >> i) & 1)) {
-                if (pending_write)
-                    mem_write(start_addr, cur_len, &buf);
-                pending_write = false;
-                cur_len = 0;
-                continue;
-            }
 
-            if (!pending_write) {
-                pending_write = true;
-                start_addr = strb_addr;
-            }
-            cur_len++;
-            buf_u8[strb_addr - start_addr] = (wtxn.wdata[i / (AXI_WDATA_TYLEN / 8)] >> ((i % (AXI_WDATA_TYLEN / 8)) * 8)) & 0xFF;
+        strb = wtxn.wstrb;
+        while (find_strb_transation(strb, &woff, &wlen)) {
+            mem_write(awtxn.awaddr + woff, wlen, (uint8_t *)(&wtxn.wdata) + woff);
+            strb &= ~GENMASK(woff + wlen - 1, woff);
         }
-        if (pending_write)
-            mem_write(start_addr, cur_len, &buf);
 
         if (wtxn.wlast) {
             AXILog("%s: write, last tick\n", name);
