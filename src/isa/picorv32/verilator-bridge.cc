@@ -10,9 +10,10 @@
 #include "verilated_vcd_c.h"
 
 Vpicorv32_axi *tb;
-VerilatedVcdC	*m_trace;
-AXIResponder *axi;
-AXIResponder::connections conn;
+VerilatedVcdC *m_trace;
+
+AXIResponder<32, uint32_t, uint8_t, uint8_t> *axi;
+AXIResponder<32, uint32_t, uint8_t, uint8_t>::connections conn;
 
 uint8_t dummy_out8;
 uint8_t const_zero8 = 0;
@@ -97,34 +98,26 @@ extern "C" int Vinit(int argc, char **argv) {
 	conn = {
 		.aw_awvalid = &tb->mem_axi_awvalid,
 		.aw_awready = &tb->mem_axi_awready,
-		.aw_awid = &const_zero8,
-		.aw_awlen = &const_zero8,
 		.aw_awaddr = &tb->mem_axi_awaddr,
 		
 		.w_wvalid = &tb->mem_axi_wvalid,
 		.w_wready = &tb->mem_axi_wready,
 		.w_wdata = &tb->mem_axi_wdata,
 		.w_wstrb = &tb->mem_axi_wstrb,
-		.w_wlast = &tb->mem_axi_wvalid,
 		
 		.b_bvalid = &tb->mem_axi_bvalid,
 		.b_bready = &tb->mem_axi_bready,
-		.b_bid = &const_zero8,
 
 		.ar_arvalid = &tb->mem_axi_arvalid,
 		.ar_arready = &tb->mem_axi_arready,
-		.ar_arid = &const_zero8,
-		.ar_arlen = &const_zero8,
 		.ar_araddr = &tb->mem_axi_araddr,
 	
 		.r_rvalid = &tb->mem_axi_rvalid,
 		.r_rready = &tb->mem_axi_rready,
-		.r_rid = &const_zero8,
-		.r_rlast = &dummy_out8,
 		.r_rdata = &tb->mem_axi_rdata,
 	};
 
-    axi = new AXIResponder(conn, "main_mem");
+    axi = new AXIResponder<32, uint32_t, uint8_t, uint8_t>(conn, "main_mem");
     axi->mem_read = mem_read;
     axi->mem_write = mem_write;
 
